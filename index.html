@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多采多姿的植物 - 國小三年級自然互動學習遊戲</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f2fbf4',
+              100: '#e1f7e6',
+              200: '#c5eed0',
+              400: '#6ee08b',
+              500: '#38c75d',
+              600: '#23a446',
+              700: '#1e823a',
+              800: '#1c6631',
+              900: '#18542b',
+            },
+            warm: {
+              amber: '#fef3c7',
+              earth: '#78350f',
+              sand: '#fefae0',
+              clay: '#b45309'
+            }
+          },
+          fontFamily: {
+            sans: ['"PingFang TC"', '"Noto Sans TC"', '"Microsoft JhengHei"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-card {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px -5px rgba(34, 139, 34, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    }
+    .custom-bounce:hover {
+      transform: translateY(-3px) scale(1.01);
+    }
+    /* 隱藏滾動條但保持滾動 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-emerald-50 via-teal-50 to-green-100 min-h-screen text-slate-800 font-sans antialiased selection:bg-brand-200">
+
+  <!-- 音效管理器 (Web Audio API) -->
+  <script>
+    const soundManager = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      play(type) {
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          if (type === 'correct') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, now); // C5
+            osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+            osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+            osc.start(now);
+            osc.stop(now + 0.35);
+          } else if (type === 'wrong') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(260, now);
+            osc.frequency.exponentialRampToValueAtTime(170, now + 0.25);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+            osc.start(now);
+            osc.stop(now + 0.28);
+          } else if (type === 'click') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+            osc.start(now);
+            osc.stop(now + 0.06);
+          } else if (type === 'win') {
+            // 慶祝旋律
+            [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+              const noteOsc = this.ctx.createOscillator();
+              const noteGain = this.ctx.createGain();
+              noteOsc.type = 'triangle';
+              noteOsc.frequency.value = freq;
+              noteOsc.connect(noteGain);
+              noteGain.connect(this.ctx.destination);
+              noteGain.gain.setValueAtTime(0.15, now + i * 0.12);
+              noteGain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
+              noteOsc.start(now + i * 0.12);
+              noteOsc.stop(now + i * 0.12 + 0.22);
+            });
+          }
+        } catch(e) {
+          console.warn("Audio unavailable", e);
+        }
+      }
+    };
+  </script>
+
+  <!-- 頂部導航列 -->
+  <header class="bg-white/95 sticky top-0 z-40 border-b border-emerald-100 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('quiz')">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
+          <i class="ph-bold ph-plant text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold text-emerald-950 flex items-center gap-2">
+            多采多姿的植物 <span class="text-xs px-2 py-0.5 bg-brand-100 text-brand-800 rounded-full font-semibold">國小三年級自然</span>
+          </h1>
+          <p class="text-xs text-slate-500">根、莖、葉、花、果實與種子探索天地</p>
+        </div>
+      </div>
+
+      <!-- 導航切換鈕 -->
+      <nav class="flex items-center gap-1 sm:gap-2">
+        <button id="nav-quiz" onclick="switchTab('quiz')" class="px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all bg-brand-600 text-white shadow-sm">
+          <i class="ph-bold ph-check-square-offset text-lg"></i>
+          <span>30題選擇題</span>
+        </button>
+        <button id="nav-context" onclick="switchTab('context')" class="px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:bg-emerald-50">
+          <i class="ph-bold ph-lightbulb-filament text-lg"></i>
+          <span>3大素養題組</span>
+        </button>
+        <button id="nav-cards" onclick="switchTab('cards')" class="px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:bg-emerald-50">
+          <i class="ph-bold ph-cards text-lg"></i>
+          <span>植物百寶箱</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="max-w-5xl mx-auto px-4 py-6 md:py-8">
+
+    <!-- ============================================== -->
+    <!-- 模式 1: 30題選擇題模式                           -->
+    <!-- ============================================== -->
+    <section id="quiz-section" class="space-y-6">
+      <!-- 狀態列與控制器 -->
+      <div class="glass-card rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-emerald-100">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-400">目前進度</span>
+            <span id="quiz-progress-text" class="text-base font-extrabold text-brand-700">第 1 / 30 題</span>
+          </div>
+          <div class="w-32 sm:w-48 bg-slate-100 h-3 rounded-full overflow-hidden">
+            <div id="quiz-progress-bar" class="bg-brand-500 h-full w-0 transition-all duration-300 rounded-full"></div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-sm font-bold">
+            <i class="ph-fill ph-star text-amber-500 text-base"></i>
+            <span>得分：<span id="quiz-score">0</span> 分</span>
+          </div>
+          <button onclick="restartQuiz()" class="p-2 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-xl transition-all" title="重新測驗">
+            <i class="ph-bold ph-arrow-counter-clockwise text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 題號快捷列 (小圓鈕) -->
+      <div id="question-navigator" class="glass-card rounded-2xl p-3 border border-emerald-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <!-- JS 動態生成 1-30 題按鈕 -->
+      </div>
+
+      <!-- 題目卡片本體 -->
+      <div class="glass-card rounded-3xl p-6 sm:p-8 border border-emerald-100 relative overflow-hidden transition-all duration-300">
+        <!-- 類別標籤 -->
+        <div class="flex items-center justify-between mb-4">
+          <span id="q-category" class="inline-flex items-center gap-1 px-3 py-1 bg-brand-100 text-brand-800 text-xs sm:text-sm font-semibold rounded-full">
+            <i class="ph-bold ph-tag"></i> 知識點
+          </span>
+          <span id="q-badge" class="text-xs font-bold text-slate-400">選擇題</span>
+        </div>
+
+        <!-- 題目內文 -->
+        <h2 id="q-title" class="text-xl sm:text-2xl font-bold text-slate-800 leading-relaxed mb-6">
+          題目加載中...
+        </h2>
+
+        <!-- 選項列表 -->
+        <div id="q-options" class="grid grid-cols-1 gap-3.5 sm:gap-4 mb-6">
+          <!-- JS 動態渲染 4 個選項 -->
+        </div>
+
+        <!-- 解答與詳解回饋 (作答後顯示) -->
+        <div id="q-feedback" class="hidden p-5 rounded-2xl border transition-all duration-300 mb-6">
+          <div class="flex items-start gap-3">
+            <div id="feedback-icon" class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-lg"></div>
+            <div class="space-y-1">
+              <h4 id="feedback-title" class="font-bold text-base"></h4>
+              <p id="feedback-explanation" class="text-sm leading-relaxed text-slate-600"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 下方控制按鈕 -->
+        <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+          <button id="btn-prev" onclick="changeQuestion(-1)" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none">
+            <i class="ph-bold ph-caret-left"></i> 上一題
+          </button>
+          <button id="btn-next" onclick="changeQuestion(1)" class="px-5 py-2.5 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 shadow-md shadow-brand-500/20 flex items-center gap-1">
+            下一題 <i class="ph-bold ph-caret-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- 模式 2: 素養題組挑戰模式                        -->
+    <!-- ============================================== -->
+    <section id="context-section" class="hidden space-y-8">
+      <!-- 題組導覽分頁按鈕 -->
+      <div class="flex flex-wrap gap-2 sm:gap-3">
+        <button onclick="switchContextScenario(0)" id="case-tab-0" class="case-tab px-4 py-2.5 rounded-2xl font-bold text-sm bg-brand-600 text-white shadow-sm flex items-center gap-2">
+          <i class="ph-bold ph-house-line"></i> 題組一：校園菜園大比拼
+        </button>
+        <button onclick="switchContextScenario(1)" id="case-tab-1" class="case-tab px-4 py-2.5 rounded-2xl font-bold text-sm bg-white text-slate-600 hover:bg-brand-50 flex items-center gap-2">
+          <i class="ph-bold ph-compass"></i> 題組二：神奇植物探險隊
+        </button>
+        <button onclick="switchContextScenario(2)" id="case-tab-2" class="case-tab px-4 py-2.5 rounded-2xl font-bold text-sm bg-white text-slate-600 hover:bg-brand-50 flex items-center gap-2">
+          <i class="ph-bold ph-bowl-food"></i> 題組三：餐桌蔬菜大解密
+        </button>
+      </div>
+
+      <!-- 題組主體容器 -->
+      <div id="case-content-area" class="glass-card rounded-3xl p-6 sm:p-8 border border-emerald-100">
+        <!-- 動態渲染題組情境與小題 -->
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- 模式 3: 植物知識百寶箱 (圖卡複習)              -->
+    <!-- ============================================== -->
+    <section id="cards-section" class="hidden space-y-6">
+      <div class="text-center max-w-xl mx-auto space-y-2 mb-8">
+        <h2 class="text-2xl font-bold text-emerald-950 flex items-center justify-center gap-2">
+          <i class="ph-fill ph-book-open-text text-brand-600"></i> 植物構造百寶箱
+        </h2>
+        <p class="text-sm text-slate-600">點擊不同標籤，快速複習本單元最核心的科學概念！</p>
+      </div>
+
+      <!-- 分類標籤 -->
+      <div class="flex flex-wrap justify-center gap-2 mb-6">
+        <button onclick="filterFlashcards('all')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-brand-600 text-white">全部卡片</button>
+        <button onclick="filterFlashcards('root')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50">根的構造與吸水</button>
+        <button onclick="filterFlashcards('stem')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50">莖的三種形態</button>
+        <button onclick="filterFlashcards('leaf')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50">葉序與葉脈</button>
+        <button onclick="filterFlashcards('flower')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50">花與果實種子</button>
+        <button onclick="filterFlashcards('life')" class="flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50">生活中的植物</button>
+      </div>
+
+      <!-- 圖卡網格 -->
+      <div id="flashcards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- 動態產生知識卡 -->
+      </div>
+    </section>
+
+    <!-- 測驗結算彈窗 -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center space-y-5 shadow-2xl border border-emerald-100">
+        <div class="w-20 h-20 mx-auto rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center text-4xl shadow-inner">
+          <i class="ph-fill ph-trophy"></i>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-2xl font-bold text-slate-800">測驗挑戰完成！</h3>
+          <p class="text-sm text-slate-500">恭喜你完成了 30 題植物大挑戰！</p>
+        </div>
+
+        <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 space-y-2">
+          <div class="flex justify-between items-center text-sm font-bold">
+            <span class="text-slate-600">答對題數：</span>
+            <span id="final-correct-count" class="text-brand-700 text-lg">0 / 30</span>
+          </div>
+          <div class="flex justify-between items-center text-sm font-bold">
+            <span class="text-slate-600">總得分：</span>
+            <span id="final-score" class="text-emerald-700 text-2xl font-black">0 分</span>
+          </div>
+          <div class="flex justify-between items-center text-sm font-bold">
+            <span class="text-slate-600">獲得榮譽：</span>
+            <span id="final-badge" class="px-2.5 py-1 bg-amber-200 text-amber-900 rounded-lg text-xs">植物小博士</span>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button onclick="closeResultModal()" class="flex-1 py-3 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm hover:bg-slate-50">
+            查看答題檢討
+          </button>
+          <button onclick="restartQuiz(); closeResultModal();" class="flex-1 py-3 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-md shadow-brand-500/20">
+            重新挑戰
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- JavaScript 資料庫與互動邏輯 -->
+  <script>
+    /* =========================================================
+       1. 30 題高頻選擇題資料庫 (依據三上第一單元多采多姿的植物)
+       ========================================================= */
+    const quizQuestions = [
+      {
+        id: 1,
+        cat: "生物與非生物",
+        q: "在校園觀察中，下列哪一組全部都屬於「有生命」的生物？",
+        options: ["大鳳蝶、樟樹、仙丹花", "白頭翁、鐵椅子、單槓", "石頭、榕樹、泥土", "蝴蝶、水池邊的石頭、落葉堆"],
+        answer: 0,
+        exp: "樟樹、仙丹花（植物）與大鳳蝶（動物）都有生命，會長大並繁衍後代；石頭與鐵椅等則是非生物。"
+      },
+      {
+        id: 2,
+        cat: "植物構造",
+        q: "一般開花植物的身體，通常可以分成哪六大部分？",
+        options: ["頭、胸、腹、手、腳、翅膀", "根、莖、葉、花、果實、種子", "葉片、葉柄、葉脈、樹皮、樹洞、年輪", "種子、果肉、花蕊、花粉、蜜腺、甘露"],
+        answer: 1,
+        exp: "植物身體大部分由「根、莖、葉、花、果實、種子」六大器官構造組成。"
+      },
+      {
+        id: 3,
+        cat: "植物的葉",
+        q: "葉片上有一條條如同血管般的紋路，稱為「葉脈」，它的主要功能是什麼？",
+        options: ["專門用來吸附昆蟲", "負責輸送水分和養分", "製造芳香氣味", "吸收地底下的水分"],
+        answer: 1,
+        exp: "葉脈貫穿葉片，主要功能是輸送植物體內的水分和養分。"
+      },
+      {
+        id: 4,
+        cat: "葉脈形態",
+        q: "觀察百合花或玉米的葉子，其葉脈紋路一條條平行排列，這種葉脈稱為什麼？",
+        options: ["網狀脈", "對稱脈", "平行脈", "輪生脈"],
+        answer: 2,
+        exp: "如百合、水稻、蔥的葉脈呈一條條平行排列，稱為「平行脈」；像桂花、樟樹像網狀交錯的則為「網狀脈」。"
+      },
+      {
+        id: 5,
+        cat: "葉的生長位置",
+        q: "植物枝條上生長葉子、長出新芽的小結點，我們稱為什麼部位？",
+        options: ["節", "葉柄", "側脈", "鬚部"],
+        answer: 0,
+        exp: "植物莖或枝條上長出葉子的位置稱為「節」，節的附近常有頂芽或側芽。"
+      },
+      {
+        id: 6,
+        cat: "葉序",
+        q: "如果一個節上只長出「1片」葉子，且左右交錯向上生長，這種排列方式稱為什麼？",
+        options: ["對生", "互生", "輪生", "散生"],
+        answer: 1,
+        exp: "每個節上只生長1片葉子，交錯排列者稱為「互生」（例如榕樹、樟樹、朱槿）。"
+      },
+      {
+        id: 7,
+        cat: "葉序",
+        q: "觀察桂花或福木時，發現每個節上同時相對生長出「2片」葉子，這種葉序稱為？",
+        options: ["互生", "對生", "輪生", "群生"],
+        answer: 1,
+        exp: "每個節上同時相對長出2片葉子稱為「對生」（例如桂花、福木、大花咸豐草）。"
+      },
+      {
+        id: 8,
+        cat: "葉序",
+        q: "黑板樹的莖上，同一個節上同時環繞長出「3片或更多片」葉子，這種排列方式是？",
+        options: ["對生", "輪生", "互生", "疊生"],
+        answer: 1,
+        exp: "同一個節上環生3片以上的葉子稱為「輪生」（例如黑板樹、軟枝黃蟬）。"
+      },
+      {
+        id: 9,
+        cat: "葉的功能",
+        q: "植物的葉子互相錯開生長、盡量不互相重疊，最重要的目的是什麼？",
+        options: ["好看好吹風", "獲取更多陽光來製造養分", "躲避毛毛蟲啃食", "讓雨水能快速排掉"],
+        answer: 1,
+        exp: "葉子互相錯開排列（葉序），是為了避免互相遮蔽，讓下方的葉片也能充分接收陽光製造養分。"
+      },
+      {
+        id: 10,
+        cat: "莖的分類",
+        q: "樟樹和小葉欖仁的莖粗壯高大且質地堅硬，表面常有樹皮或縱裂紋，這屬於哪種莖？",
+        options: ["草本莖", "藤本莖", "木本莖", "肉質莖"],
+        answer: 2,
+        exp: "木本莖通常粗大堅硬、可多年生長並長得很高大，有利爭取陽光。"
+      },
+      {
+        id: 11,
+        cat: "莖的分類",
+        q: "大花咸豐草與長春花的莖通常較細軟且呈綠色，但仍能支撐植物直立，這屬於哪種莖？",
+        options: ["木本莖", "藤本莖", "草本莖", "水生莖"],
+        answer: 2,
+        exp: "草本莖通常較細軟，但能自己支撐直立，並會向四面八方長出枝條爭取光照。"
+      },
+      {
+        id: 12,
+        cat: "莖的分類",
+        q: "牽牛花和絲瓜的莖柔軟細長、無法自己直立，需要攀爬纏繞在竹竿或物體上，屬於？",
+        options: ["藤本莖", "草本莖", "木本莖", "軸生莖"],
+        answer: 0,
+        exp: "藤本莖無法獨立直立，必須藉由卷鬚或纏繞其他物體向上攀爬爭取陽光。"
+      },
+      {
+        id: 13,
+        cat: "莖的特徵",
+        q: "小智在校園觀察木棉樹的樹幹時，發現樹皮上有許多粗糙的小突起或尖刺，這些稱為？",
+        options: ["氣孔", "瘤刺", "葉脈", "皮芽"],
+        answer: 1,
+        exp: "木棉的樹幹木本莖表面常具有「瘤刺」等特殊外觀構造。"
+      },
+      {
+        id: 14,
+        cat: "根的功能",
+        q: "大部分植物的根生長在土壤中，下列哪一項「不是」植物根的主要功能？",
+        options: ["抓住土壤、固定植物", "吸收水分和養分", "吸收陽光進行光合作用", "幫助高大的樹木站穩"],
+        answer: 2,
+        exp: "根通常長在沒有陽光的地下，負責固定植物與吸收水分、養分；製造養分主要由葉片行光合作用。"
+      },
+      {
+        id: 15,
+        cat: "根的形態",
+        q: "小白菜、菠菜具有一條粗粗長長的主根，周圍長著細小側根，這種根系稱為什麼？",
+        options: ["鬚根", "軸根", "氣生根", "附生根"],
+        answer: 1,
+        exp: "有一條明顯粗壯的主根、旁邊伴隨細根的稱為「軸根」（如小白菜、菠菜、莧菜）。"
+      },
+      {
+        id: 16,
+        cat: "根的形態",
+        q: "蔥和蒜的根沒有明顯的主根，全部都是細細長長、像老爺爺鬍鬚一樣，這種根稱為？",
+        options: ["軸根", "鬚根", "木本根", "主根"],
+        answer: 1,
+        exp: "整團由許多粗細相近的細根組成、像鬍鬚一般的稱為「鬚根」（如蔥、蒜、玉米、水稻）。"
+      },
+      {
+        id: 17,
+        cat: "科學實驗",
+        q: "課堂做「植物吸水實驗」時，把植物插入水瓶後，為什麼要用「油土或膠泥」封住瓶口？",
+        options: ["防止水直接蒸發到空氣中，以確保水位下降是根部吸收所致", "防止植物倒下來摔破水瓶", "為了提供植物呼吸需要的氧氣", "為了不讓瓶子散發出香味"],
+        answer: 0,
+        exp: "用油土封緊瓶口是科學控制變因，防止水分直接自然蒸發，才能證明是「根部吸水」使水位下降。"
+      },
+      {
+        id: 18,
+        cat: "花朵構造",
+        q: "一朵完整的花通常包含四個主要部分，下列哪一個「不是」這四個部分之一？",
+        options: ["花瓣", "雄蕊與雌蕊", "花萼", "葉柄"],
+        answer: 3,
+        exp: "花朵的基本構造包含：花萼、花瓣、雄蕊、雌蕊。「葉柄」是葉子的構造。"
+      },
+      {
+        id: 19,
+        cat: "花朵構造",
+        q: "雄蕊頂端常有黃色粉末狀物質，這些微小的顆粒稱為什麼？",
+        options: ["花蜜", "花粉", "花露", "胚珠"],
+        answer: 1,
+        exp: "雄蕊頂端膨大處有「花粉」，藉由風或昆蟲傳到雌蕊柱頭上完成授粉。"
+      },
+      {
+        id: 20,
+        cat: "花的傳粉",
+        q: "杜鵑花鮮豔的花瓣、月橘（七里香）濃郁的花香，最主要的作用是什麼？",
+        options: ["嚇跑所有小動物", "吸引蜜蜂、蝴蝶等昆蟲前來採蜜，幫助傳播花粉", "讓整棵樹變重不易被風吹倒", "直接吸收雨水"],
+        answer: 1,
+        exp: "鮮豔花瓣、芳香氣味與甜美花蜜都是為了吸引昆蟲等傳粉媒介，幫助植物繁衍後代。"
+      },
+      {
+        id: 21,
+        cat: "果實與種子",
+        q: "植物開花授粉之後，花朵枯謝，通常會結出什麼構造？裡面包著種子？",
+        options: ["果實", "新莖", "頂芽", "節"],
+        answer: 0,
+        exp: "花朵受粉完成後通常會發育為「果實」，果實內部則包藏著保護好的「種子」。"
+      },
+      {
+        id: 22,
+        cat: "種子傳播",
+        q: "臺灣欒樹的果實像一顆顆粉紅色膨脹的小氣球，成熟後乾燥變輕，主要利用什麼方式傳播種子？",
+        options: ["隨風飄揚傳播", "黏在動物毛皮上", "果實很香被鳥吃掉", "沉入深水中流動"],
+        answer: 0,
+        exp: "臺灣欒樹果實如紙膜氣囊般輕盈，能隨風滑翔飄移，將種子帶到遠處繁衍。"
+      },
+      {
+        id: 23,
+        cat: "種子傳播",
+        q: "像龍眼、番石榴（芭樂）、木瓜等水果，果肉甜美多汁，主要靠什麼方式傳播種子？",
+        options: ["水流漂送", "吸引動物採食後排泄傳播", "自行彈射", "風力吹拂"],
+        answer: 1,
+        exp: "美味多汁的果肉吸引動物取食，堅硬的種子不易被消化，會隨著動物排泄物散布到各地。"
+      },
+      {
+        id: 24,
+        cat: "生活與植物",
+        q: "我們日常穿著柔軟透氣的棉質衣服（T恤），是由哪一種植物的纖維製成的？",
+        options: ["稻子", "棉花", "薄荷", "大花咸豐草"],
+        answer: 1,
+        exp: "棉衣、棉被等織品原料主要來自「棉花」果實裂開後的棉纖維。"
+      },
+      {
+        id: 25,
+        cat: "生活與植物",
+        q: "原住民族達悟族（雅美族）傳統製作的「拼板舟」以及步道上的「木棧道」，是利用植物的什麼部位？",
+        options: ["花瓣", "葉片", "堅硬粗壯的木本莖（木材）", "果實外皮"],
+        answer: 2,
+        exp: "房屋（木屋）、家具、船隻（拼板舟）與步道木棧道，都是運用樹木堅硬的「莖（木材）」加工製作。"
+      },
+      {
+        id: 26,
+        cat: "特殊植物",
+        q: "生長在乾旱地區的「生石花（又稱石頭玉）」，外觀長得極像小石頭，這外表其實是它的什麼部位？",
+        options: ["根", "花", "厚厚的肥大肉質葉", "果實"],
+        answer: 2,
+        exp: "生石花像石頭的外表其實是它肥厚的「葉子」，能儲存大量水分耐旱，並擬態成石頭避開草食動物。"
+      },
+      {
+        id: 27,
+        cat: "植物的氣味",
+        q: "薄荷、九層塔、香茅在被碰觸時會散發濃烈特殊氣味，在自然界中這氣味對植物有何好處？",
+        options: ["只是為了吸引人類料理三杯雞", "是植物的秘密武器，能驅趕或防止昆蟲啃食葉片", "能吸收土壤更多肥料", "能讓根長得更深"],
+        answer: 1,
+        exp: "這些氣味是植物演化出的化學防禦機制（精油揮發），能避免昆蟲啃食幼葉以保護自己。"
+      },
+      {
+        id: 28,
+        cat: "生活蔬菜",
+        q: "吃火鍋常見的「玉米筍」，在植物學上到底是玉米的哪一個階段？",
+        options: ["玉米地底下的變態根", "玉米的嫩莖", "玉米果穗尚未長大成熟的小果實", "玉米的花瓣"],
+        answer: 2,
+        exp: "玉米筍是玉米在果實幼小、尚未完全成熟時摘下的小果穗，屬於「果實」構造。"
+      },
+      {
+        id: 29,
+        cat: "生活蔬菜",
+        q: "小明去超市要買夾在漢堡三明治裡的生菜「結球萵苣」，結果誤拿了長得很像的「高麗菜」，這兩種蔬菜我們吃的主要都是哪一個部位？",
+        options: ["根", "莖", "層層包裹的葉子", "種子"],
+        answer: 2,
+        exp: "不論是高麗菜或結球萵苣，我們平時食用的部位都是它層層包捲成球狀的「葉」。"
+      },
+      {
+        id: 30,
+        cat: "環境觀察守則",
+        q: "在校園或戶外觀察大自然植物時，下列哪一項做法是「最安全正確」的行為？",
+        options: ["隨手採摘漂亮的花朵戴在頭上", "摘下不知名果實立刻放入口中嚐味道", "遇到長有尖刺或會分泌白色乳汁的植物不要隨意徒手觸碰", "大力搖晃樹幹把松鼠趕下來"],
+        answer: 2,
+        exp: "觀察植物務必注意安全，部分植物有尖刺或乳汁（如長春花汁液具毒性），不可隨意採摘或放入口中食用。"
+      }
+    ];
+
+    /* =========================================================
+       2. 三大素養題組資料庫
+       ========================================================= */
+    const contextCases = [
+      {
+        id: "case1",
+        title: "題組一：校園菜園大比拼與花園規劃",
+        badge: "生活探究 / 形態適應",
+        story: `小萱在放假時回鄉下看望爺爺，爺爺送給她三種植物幼苗讓她帶回城市綠化庭院：
+        【A. 牽牛花】：葉脈為網狀脈、互生葉序，屬於藤本莖，有軸根，喜歡充足日照，莖會旋轉攀爬在棚架上。
+        【B. 彩葉草】：葉脈為網狀脈、對生葉序，屬於草本莖，有軸根，葉片顏色色彩斑斕，需要日照但強光易枯焦。
+        【C. 番石榴（芭樂）】：葉脈為網狀脈、對生葉序，屬於粗壯木本莖，具軸根，成熟後會結出芳香甜美、多籽的果實。`,
+        questions: [
+          {
+            q: "1. 觀察小萱整理的資料，牽牛花、彩葉草和番石榴這三種植物，哪一項特徵是完全相同的？",
+            options: ["葉序的排列方式", "葉脈的類型（皆為網狀脈）", "莖的形態結構", "果實甜美的程度"],
+            ans: 1,
+            exp: "三種植物的葉脈全部都是「網狀脈」，且根系皆為軸根；但在葉序（互生/對生）與莖形態（藤本/草本/木本）則各有不同。"
+          },
+          {
+            q: "2. 小萱想在庭院圍籬邊種植植物，希望植物能在竹籬笆上爬滿綠葉與花朵，你建議她挑選哪種植物？理由是什麼？",
+            options: [
+              "番石榴，因為樹幹高大能撐住籬笆",
+              "牽牛花，因為它具有柔軟能纏繞攀爬的「藤本莖」",
+              "彩葉草，因為它的葉子顏色很鮮豔好看",
+              "隨便哪一種都可以，只要澆水都會爬上牆"
+            ],
+            ans: 1,
+            exp: "牽牛花的莖屬於「藤本莖」，柔軟且具有纏繞攀附能力，最適合沿著圍籬架向上生長。"
+          },
+          {
+            q: "3. 幾個月後，小萱希望能親手摘採香甜水果跟同學分享，哪一株植物能達成她的願望？",
+            options: [
+              "牽牛花，結出像氣球一樣的果實",
+              "彩葉草，結出多彩美味的果肉",
+              "番石榴，木本莖持續長大並結出芳香可口的漿果",
+              "三種植物都不會結果實"
+            ],
+            ans: 2,
+            exp: "番石榴是果樹，成熟後果實清脆芳香甜美，裡面包有種子，可供採收食用。"
+          }
+        ]
+      },
+      {
+        id: "case2",
+        title: "題組二：神奇植物探險隊（生石花與香草魔術）",
+        badge: "適應生存 / 科學閱讀",
+        story: `三年級自然小偵探隊在植物園的乾燥多肉區與香草花園進行觀察：
+        【發現一】：生長在砂礫中的「生石花（石頭玉）」，兩片圓滾滾胖嘟嘟的肉質構造緊貼地面，顏色灰灰斑駁，遊客第一眼常誤以為是小鵝卵石。
+        【發現二】：走到香草花園，小組輕輕撫摸「薄荷」與「九層塔」的葉子，手指立刻沾上強烈清涼與辛香的氣味，而且很少看見菜青蟲在上面啃食。`,
+        questions: [
+          {
+            q: "1. 生石花圓嘟嘟像小石頭的外形，在植物構造上其實是它的什麼部位？具有什麼主要功能？",
+            options: [
+              "是特化的花瓣，用來吸引蜜蜂",
+              "是肥厚儲水的「葉」，既能保持水分不被晒乾，又能擬態石頭避免被動物吃掉",
+              "是裸露在外的果實，方便隨風滾動",
+              "是長在地上的軸根，專門用來抓住土壤"
+            ],
+            ans: 1,
+            exp: "生石花像石頭的部分是一對高度肉質化的葉子，儲存極多水分以適應乾旱沙漠，擬態石頭可騙過草食動物。"
+          },
+          {
+            q: "2. 薄荷和九層塔葉片散發特殊氣味，在自然界中對植物本身生存最大的好處是什麼？",
+            options: [
+              "當作防禦天敵的秘密武器，使吃葉子的昆蟲不敢靠近啃食",
+              "把水氣快速排掉以防止爛根",
+              "吸引鳥類過來築巢",
+              "幫助莖長出厚厚的木質部"
+            ],
+            ans: 0,
+            exp: "芳香與清涼氣味是植物分泌的揮發性精油，主要是化學防禦機制，讓許多昆蟲不願靠近食用以保護自己。"
+          },
+          {
+            q: "3. 人類將這些植物的特殊氣味應用在日常生活中，下列配對哪一項符合課本所學？",
+            options: [
+              "薄荷葉加入三杯雞增加甜味",
+              "薄荷帶有清涼芳香，常加入冰淇淋或糖果中；九層塔則常加入炒三杯雞或羹湯提升料理風味",
+              "生石花搗碎當成染料做衣服",
+              "九層塔葉片曬乾拿來當木棧道建材"
+            ],
+            ans: 1,
+            exp: "薄荷清新清涼，常做成口香糖、牙膏或薄荷冰淇淋；九層塔香氣濃郁，是臺灣常見料理（如三杯雞、鹹酥雞、羹湯）的香料靈魂。"
+          }
+        ]
+      },
+      {
+        id: "case3",
+        title: "題組三：神秘的玉米筍與餐桌蔬菜大解密",
+        badge: "日常連結 / 觀察探究",
+        story: `阿寶陪媽媽去逛全聯超市買菜準備煮火鍋：
+        媽媽吩咐：「幫我拿一盒煮火鍋大家最愛的玉米筍，再去蔬菜區拿一顆加在三明治裡圓圓脆脆的生菜（結球萵苣），另外抓一把煮湯爆香用的青蔥喔！」
+        阿寶在蔬菜冷藏櫃前仔細觀察這些新鮮美味的植物蔬菜……`,
+        questions: [
+          {
+            q: "1. 很多人以為玉米筍是竹筍的一種，阿寶想起自然課所學，玉米筍真正的身分是？",
+            options: [
+              "玉米剛冒出泥土的幼嫩莖",
+              "玉米植物的幼嫩「果實」（尚未成熟就先摘下的玉米小果穗）",
+              "一種長得像玉米的地下鬚根",
+              "生長在竹子上的小苞葉"
+            ],
+            ans: 1,
+            exp: "玉米筍並不是筍子，而是玉米在果實尚幼小時摘採下來的嫩果穗，構造上屬於「果實」。"
+          },
+          {
+            q: "2. 阿寶拿了一顆高麗菜給媽媽，媽媽笑著說：「這是高麗菜，我要的是結球萵苣喔！」請問結球萵苣和高麗菜雖然都是球形，但我們吃的主要都是植物的哪一個部位？",
+            options: ["種子", "葉片（層層緊密包覆的葉）", "果肉", "主根"],
+            ans: 1,
+            exp: "高麗菜（甘藍）與結球萵苣都是由許多葉片互相包裹重疊生長而成的「葉球」，我們食用的是「葉」。"
+          },
+          {
+            q: "3. 媽媽要阿寶買青蔥，回家洗菜時阿寶發現青蔥底部的根全都是一束白白細細的絲狀物，這屬於什麼根？而菠菜底下有一條粗粗紅紅的根又是什麼根？",
+            options: [
+              "青蔥是軸根；菠菜是鬚根",
+              "青蔥是鬚根；菠菜是軸根",
+              "兩者都是木本根",
+              "兩者都沒有根，只有莖"
+            ],
+            ans: 1,
+            exp: "蔥、蒜的根細細如鬍鬚，是「鬚根」；菠菜、小白菜則有一條較粗長的主根深入土壤，是「軸根」。"
+          }
+        ]
+      }
+    ];
+
+    /* =========================================================
+       3. 知識百寶箱圖卡資料庫
+       ========================================================= */
+    const flashcardsData = [
+      {
+        category: "root",
+        title: "植物的根：軸根 vs 鬚根",
+        icon: "ph-tree-structure",
+        color: "emerald",
+        summary: "根能吸收水分與養分，並緊緊抓住土壤固定植物身體。",
+        bullets: [
+          "🌱 軸根：有一條粗壯主根深入土壤，兩旁生細根（如小白菜、菠菜、莧菜、榕樹）。",
+          "🌾 鬚根：沒有主根，全是一團細細如鬍鬚的根，分布於淺層土壤（如蔥、蒜、玉米、水稻）。",
+          "💧 吸水實驗：將水瓶口以油土密封，幾天後水位下降，證實水是由根部吸收。"
+        ]
+      },
+      {
+        category: "stem",
+        title: "植物的莖：三大形態",
+        icon: "ph-arrows-split",
+        color: "amber",
+        summary: "莖負責支撐植物身體，並向上、向外伸展，爭取充足陽光。",
+        bullets: [
+          "🌳 木本莖：高大粗壯堅硬，能持續長粗長高，表面常有樹皮、裂紋或瘤刺（如樟樹、小葉欖仁、木棉）。",
+          "🌿 草本莖：較細軟但能自行直立，向四面八方長出枝條（如長春花、大花咸豐草、昭和草）。",
+          "🎋 藤本莖：柔軟無法直立，以卷鬚或莖本身纏繞攀爬在其他物體上（如牽牛花、絲瓜）。"
+        ]
+      },
+      {
+        category: "leaf",
+        title: "葉的構造與葉序",
+        icon: "ph-leaf",
+        color: "green",
+        summary: "葉片透過葉綠素接收陽光製造養分，是植物最重要的廚房。",
+        bullets: [
+          "🍃 葉片構造：葉形（心形、卵形）、葉緣（平滑、鋸齒狀）、葉脈（平行脈、網狀脈）。",
+          "🔀 互生：每節長出1片葉子，交替向上（榕樹、朱槿）。",
+          "👥 對生：每節相對長出2片葉子（桂花、福木）。",
+          "🎡 輪生：每節長出3片或更多片葉子環繞（黑板樹）。",
+          "☀️ 錯開生長：不互相遮蓋，使每片葉子都能曬到太陽。"
+        ]
+      },
+      {
+        category: "flower",
+        title: "花與果實、種子",
+        icon: "ph-flower",
+        color: "rose",
+        summary: "繁衍下一代的重要構造，吸引傳粉媒介並散播種子。",
+        bullets: [
+          "🌸 花的基本構造：花萼（保護花苞）、花瓣（鮮豔吸引昆蟲）、雄蕊（頂端花粉）、雌蕊（接受花粉）。",
+          "🍎 果實保護與傳播：開花受精後發育成果實，果實包裹保護種子。",
+          "🌬️ 風力傳播：果實輕薄或像氣囊（如臺灣欒樹、昭和草冠毛）。",
+          "🐦 動物傳播：果肉香甜多汁引動物採食，種子隨糞便排出（龍眼、番石榴、木瓜）。"
+        ]
+      },
+      {
+        category: "life",
+        title: "植物與我們的食衣住行育樂",
+        icon: "ph-heart",
+        color: "blue",
+        summary: "人類食衣住行育樂處處依賴植物，也是野生動物的重要棲地。",
+        bullets: [
+          "🍚 食：米飯（稻米種子）、蔬菜（萵苣葉、高麗菜葉、菠菜根葉）、水果（芭樂果實）、玉米筍（嫩果實）。",
+          "👕 衣：棉花植物纖維紡織製成棉T、亞麻布料。",
+          "🏠 住與行：木材（莖）建造木屋、桌椅家具、達悟族拼板舟、登山木棧道。",
+          "🎪 育與樂：植物園生態教學、景觀花鐘美化環境、薄荷九層塔增添生活風味。"
+        ]
+      }
+    ];
+
+    /* =========================================================
+       4. 測驗模式 (Quiz) 狀態與控制邏輯
+       ========================================================= */
+    let currentQIndex = 0;
+    const userAnswers = new Array(quizQuestions.length).fill(null);
+
+    function initQuiz() {
+      renderNavigator();
+      showQuestion(currentQIndex);
+    }
+
+    function renderNavigator() {
+      const navContainer = document.getElementById('question-navigator');
+      navContainer.innerHTML = '';
+      quizQuestions.forEach((q, idx) => {
+        const btn = document.createElement('button');
+        btn.id = `nav-btn-${idx}`;
+        btn.className = `w-8 h-8 rounded-xl font-bold text-xs shrink-0 transition-all flex items-center justify-center ${
+          idx === currentQIndex 
+            ? 'bg-brand-600 text-white ring-2 ring-brand-300' 
+            : userAnswers[idx] !== null 
+              ? (userAnswers[idx] === q.answer ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800')
+              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+        }`;
+        btn.textContent = idx + 1;
+        btn.onclick = () => {
+          soundManager.play('click');
+          currentQIndex = idx;
+          showQuestion(idx);
+        };
+        navContainer.appendChild(btn);
+      });
+    }
+
+    function showQuestion(idx) {
+      const q = quizQuestions[idx];
+      document.getElementById('quiz-progress-text').textContent = `第 ${idx + 1} / ${quizQuestions.length} 題`;
+      document.getElementById('quiz-progress-bar').style.width = `${((idx + 1) / quizQuestions.length) * 100}%`;
+      
+      document.getElementById('q-category').innerHTML = `<i class="ph-bold ph-tag"></i> ${q.cat}`;
+      document.getElementById('q-title').textContent = `${idx + 1}. ${q.q}`;
+
+      const optionsContainer = document.getElementById('q-options');
+      optionsContainer.innerHTML = '';
+
+      const isAnswered = userAnswers[idx] !== null;
+
+      q.options.forEach((opt, optIdx) => {
+        const btn = document.createElement('button');
+        const letter = ['A', 'B', 'C', 'D'][optIdx];
+        
+        let styleClasses = "w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 flex items-center gap-3 font-semibold text-base ";
+        
+        if (!isAnswered) {
+          styleClasses += "border-slate-100 bg-white hover:border-brand-300 hover:bg-brand-50/50 text-slate-700 shadow-sm active:scale-[0.99]";
+        } else {
+          if (optIdx === q.answer) {
+            styleClasses += "border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-300";
+          } else if (optIdx === userAnswers[idx]) {
+            styleClasses += "border-rose-400 bg-rose-50 text-rose-900";
+          } else {
+            styleClasses += "border-slate-100 bg-slate-50/60 text-slate-400 opacity-60";
+          }
+        }
+
+        btn.className = styleClasses;
+        btn.innerHTML = `
+          <span class="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${
+            isAnswered && optIdx === q.answer ? 'bg-emerald-600 text-white' : (isAnswered && optIdx === userAnswers[idx] ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600')
+          }">${letter}</span>
+          <span class="flex-1">${opt}</span>
+          ${isAnswered && optIdx === q.answer ? '<i class="ph-bold ph-check-circle text-emerald-600 text-2xl ml-auto"></i>' : ''}
+          ${isAnswered && optIdx === userAnswers[idx] && optIdx !== q.answer ? '<i class="ph-bold ph-x-circle text-rose-500 text-2xl ml-auto"></i>' : ''}
+        `;
+
+        if (!isAnswered) {
+          btn.onclick = () => selectOption(idx, optIdx);
+        } else {
+          btn.disabled = true;
+        }
+
+        optionsContainer.appendChild(btn);
+      });
+
+      // 回饋框處理
+      const feedbackBox = document.getElementById('q-feedback');
+      if (isAnswered) {
+        feedbackBox.classList.remove('hidden');
+        const isCorrect = userAnswers[idx] === q.answer;
+        if (isCorrect) {
+          feedbackBox.className = "p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-emerald-50/90 text-emerald-900 transition-all mb-6";
+          document.getElementById('feedback-icon').className = "w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0";
+          document.getElementById('feedback-icon').innerHTML = '<i class="ph-bold ph-check"></i>';
+          document.getElementById('feedback-title').textContent = "回答正確！太棒了！🌟";
+        } else {
+          feedbackBox.className = "p-4 sm:p-5 rounded-2xl border border-rose-200 bg-rose-50/90 text-rose-900 transition-all mb-6";
+          document.getElementById('feedback-icon').className = "w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0";
+          document.getElementById('feedback-icon').innerHTML = '<i class="ph-bold ph-x"></i>';
+          document.getElementById('feedback-title').textContent = `答錯囉！正確答案是 (${['A','B','C','D'][q.answer]})`;
+        }
+        document.getElementById('feedback-explanation').textContent = q.exp;
+      } else {
+        feedbackBox.classList.add('hidden');
+      }
+
+      // 控制前後按鈕
+      document.getElementById('btn-prev').disabled = idx === 0;
+      const nextBtn = document.getElementById('btn-next');
+      if (idx === quizQuestions.length - 1) {
+        nextBtn.innerHTML = `查看結算成績 <i class="ph-bold ph-flag-checkered"></i>`;
+      } else {
+        nextBtn.innerHTML = `下一題 <i class="ph-bold ph-caret-right"></i>`;
+      }
+
+      updateScoreDisplay();
+      renderNavigator();
+    }
+
+    function selectOption(qIdx, optIdx) {
+      if (userAnswers[qIdx] !== null) return;
+      userAnswers[qIdx] = optIdx;
+
+      const q = quizQuestions[qIdx];
+      if (optIdx === q.answer) {
+        soundManager.play('correct');
+      } else {
+        soundManager.play('wrong');
+      }
+
+      showQuestion(qIdx);
+
+      // 若答滿30題，跳出完成提醒
+      const answeredTotal = userAnswers.filter(a => a !== null).length;
+      if (answeredTotal === quizQuestions.length) {
+        setTimeout(showFinalResult, 700);
+      }
+    }
+
+    function changeQuestion(delta) {
+      soundManager.play('click');
+      const nextIdx = currentQIndex + delta;
+      if (nextIdx >= quizQuestions.length) {
+        showFinalResult();
+        return;
+      }
+      if (nextIdx >= 0 && nextIdx < quizQuestions.length) {
+        currentQIndex = nextIdx;
+        showQuestion(currentQIndex);
+      }
+    }
+
+    function updateScoreDisplay() {
+      let score = 0;
+      userAnswers.forEach((ans, idx) => {
+        if (ans !== null && ans === quizQuestions[idx].answer) {
+          score += 3.33; // 30 題滿分約 100
+        }
+      });
+      document.getElementById('quiz-score').textContent = Math.round(score);
+    }
+
+    function showFinalResult() {
+      soundManager.play('win');
+      if (window.confetti) {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+      let correctCount = 0;
+      userAnswers.forEach((ans, idx) => {
+        if (ans !== null && ans === quizQuestions[idx].answer) correctCount++;
+      });
+      const finalScoreVal = Math.round((correctCount / quizQuestions.length) * 100);
+
+      document.getElementById('final-correct-count').textContent = `${correctCount} / ${quizQuestions.length}`;
+      document.getElementById('final-score').textContent = `${finalScoreVal} 分`;
+
+      let badge = "🌱 綠意小學徒";
+      if (finalScoreVal >= 90) badge = "🏆 植物大博士（卓越超群）";
+      else if (finalScoreVal >= 75) badge = "🌿 植物小達人（非常優秀）";
+      else if (finalScoreVal >= 60) badge = "🍃 自然探險家（及格通過）";
+
+      document.getElementById('final-badge').textContent = badge;
+      document.getElementById('result-modal').classList.remove('hidden');
+    }
+
+    function closeResultModal() {
+      soundManager.play('click');
+      document.getElementById('result-modal').classList.add('hidden');
+    }
+
+    function restartQuiz() {
+      soundManager.play('click');
+      for (let i = 0; i < userAnswers.length; i++) userAnswers[i] = null;
+      currentQIndex = 0;
+      initQuiz();
+    }
+
+    /* =========================================================
+       5. 素養題組 (Context Cases) 渲染與作答
+       ========================================================= */
+    let currentCaseIdx = 0;
+    const caseUserAnswers = {}; // key: "caseIndex-questionIndex"
+
+    function switchContextScenario(idx) {
+      soundManager.play('click');
+      currentCaseIdx = idx;
+      // 更新 Tab 樣式
+      document.querySelectorAll('.case-tab').forEach((tab, tIdx) => {
+        if (tIdx === idx) {
+          tab.className = "case-tab px-4 py-2.5 rounded-2xl font-bold text-sm bg-brand-600 text-white shadow-sm flex items-center gap-2";
+        } else {
+          tab.className = "case-tab px-4 py-2.5 rounded-2xl font-bold text-sm bg-white text-slate-600 hover:bg-brand-50 flex items-center gap-2";
+        }
+      });
+      renderCaseContent();
+    }
+
+    function renderCaseContent() {
+      const container = document.getElementById('case-content-area');
+      const item = contextCases[currentCaseIdx];
+
+      let questionsHtml = item.questions.map((subQ, qIdx) => {
+        const ansKey = `${currentCaseIdx}-${qIdx}`;
+        const userChoice = caseUserAnswers[ansKey];
+        const isAnswered = userChoice !== undefined;
+
+        let optionsMarkup = subQ.options.map((optText, optIdx) => {
+          let btnClass = "w-full text-left p-3.5 rounded-xl border text-sm sm:text-base font-medium transition-all flex items-start gap-3 ";
+          if (!isAnswered) {
+            btnClass += "border-slate-200 bg-white hover:border-brand-400 hover:bg-emerald-50/50 text-slate-700";
+          } else {
+            if (optIdx === subQ.ans) {
+              btnClass += "border-emerald-500 bg-emerald-50 text-emerald-950 font-bold ring-1 ring-emerald-300";
+            } else if (optIdx === userChoice) {
+              btnClass += "border-rose-400 bg-rose-50 text-rose-900";
+            } else {
+              btnClass += "border-slate-100 bg-slate-50 text-slate-400 opacity-60";
+            }
+          }
+
+          return `
+            <button 
+              ${isAnswered ? 'disabled' : ''} 
+              onclick="answerCaseQuestion(${currentCaseIdx}, ${qIdx}, ${optIdx})" 
+              class="${btnClass}">
+              <span class="w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
+                isAnswered && optIdx === subQ.ans ? 'bg-emerald-600 text-white' : (isAnswered && optIdx === userChoice ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600')
+              }">${['A','B','C','D'][optIdx]}</span>
+              <span class="flex-1">${optText}</span>
+            </button>
+          `;
+        }).join('');
+
+        let explanationMarkup = isAnswered ? `
+          <div class="mt-3 p-3.5 rounded-xl text-xs sm:text-sm ${userChoice === subQ.ans ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'bg-rose-50 text-rose-900 border border-rose-200'}">
+            <div class="font-bold mb-0.5">${userChoice === subQ.ans ? '✅ 答對了！' : '❌ 答錯了喔！'}</div>
+            <div>${subQ.exp}</div>
+          </div>
+        ` : '';
+
+        return `
+          <div class="bg-white/80 rounded-2xl p-5 border border-emerald-100/80 shadow-sm space-y-3">
+            <h4 class="font-bold text-slate-800 text-base flex items-start gap-2">
+              <span class="px-2 py-0.5 bg-brand-100 text-brand-800 rounded-md text-xs font-black">第 ${qIdx + 1} 小題</span>
+              <span>${subQ.q}</span>
+            </h4>
+            <div class="space-y-2">
+              ${optionsMarkup}
+            </div>
+            ${explanationMarkup}
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xl sm:text-2xl font-black text-emerald-950 flex items-center gap-2">
+              <i class="ph-fill ph-plant text-brand-600"></i> ${item.title}
+            </h3>
+            <span class="text-xs px-3 py-1 bg-amber-100 text-amber-800 font-bold rounded-full">${item.badge}</span>
+          </div>
+
+          <!-- 情境短文故事 -->
+          <div class="bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border-l-4 border-brand-500 p-4 sm:p-5 rounded-r-2xl space-y-2 text-slate-700 leading-relaxed text-sm sm:text-base">
+            <div class="font-bold text-emerald-900 flex items-center gap-1.5 text-sm">
+              <i class="ph-bold ph-book-open"></i> 情境閱讀與觀察資料
+            </div>
+            <div class="whitespace-pre-line">${item.story}</div>
+          </div>
+
+          <!-- 小題挑戰列表 -->
+          <div class="space-y-4 pt-2">
+            ${questionsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function answerCaseQuestion(caseIdx, qIdx, optIdx) {
+      const key = `${caseIdx}-${qIdx}`;
+      if (caseUserAnswers[key] !== undefined) return;
+      caseUserAnswers[key] = optIdx;
+
+      const subQ = contextCases[caseIdx].questions[qIdx];
+      if (optIdx === subQ.ans) {
+        soundManager.play('correct');
+      } else {
+        soundManager.play('wrong');
+      }
+
+      renderCaseContent();
+    }
+
+    /* =========================================================
+       6. 知識百寶箱圖卡複習
+       ========================================================= */
+    function filterFlashcards(cat) {
+      soundManager.play('click');
+      document.querySelectorAll('.flashcard-filter').forEach(btn => {
+        btn.className = "flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-emerald-50";
+      });
+      event.target.className = "flashcard-filter px-4 py-2 rounded-xl text-sm font-bold bg-brand-600 text-white";
+
+      renderFlashcards(cat);
+    }
+
+    function renderFlashcards(filter = 'all') {
+      const container = document.getElementById('flashcards-grid');
+      container.innerHTML = '';
+
+      const filtered = filter === 'all' 
+        ? flashcardsData 
+        : flashcardsData.filter(c => c.category === filter);
+
+      filtered.forEach(card => {
+        const cardEl = document.createElement('div');
+        cardEl.className = "glass-card rounded-2xl p-5 border border-emerald-100 flex flex-col justify-between custom-bounce transition-all duration-300";
+        cardEl.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center text-xl shrink-0">
+                <i class="ph-bold ${card.icon}"></i>
+              </div>
+              <h3 class="font-bold text-lg text-slate-800 leading-snug">${card.title}</h3>
+            </div>
+            <p class="text-xs text-brand-800 bg-brand-50/70 p-2.5 rounded-xl font-medium border border-brand-100">
+              ${card.summary}
+            </p>
+            <ul class="text-sm text-slate-600 space-y-2 pt-1">
+              ${card.bullets.map(b => `<li class="flex items-start gap-1.5 leading-relaxed text-xs sm:text-sm"><span>${b}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="pt-4 mt-3 border-t border-slate-100 flex justify-end">
+            <span class="text-xs text-brand-600 font-bold flex items-center gap-1">
+              重點複習 <i class="ph-bold ph-check-circle"></i>
+            </span>
+          </div>
+        `;
+        container.appendChild(cardEl);
+      });
+    }
+
+    /* =========================================================
+       7. 頂部模式切換處理
+       ========================================================= */
+    function switchTab(mode) {
+      soundManager.play('click');
+      const tabs = ['quiz', 'context', 'cards'];
+      tabs.forEach(t => {
+        const sec = document.getElementById(`${t}-section`);
+        const navBtn = document.getElementById(`nav-${t}`);
+        if (t === mode) {
+          sec.classList.remove('hidden');
+          navBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all bg-brand-600 text-white shadow-sm";
+        } else {
+          sec.classList.add('hidden');
+          navBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:bg-emerald-50";
+        }
+      });
+
+      if (mode === 'context') {
+        renderCaseContent();
+      } else if (mode === 'cards') {
+        renderFlashcards('all');
+      }
+    }
+
+    // 初始化啟動
+    window.addEventListener('DOMContentLoaded', () => {
+      initQuiz();
+    });
+  </script>
+</body>
+</html>
